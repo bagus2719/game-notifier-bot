@@ -1,6 +1,8 @@
+// index.js
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+const http = require('http'); // TAMBAHKAN BARIS INI
 const {
   Client,
   GatewayIntentBits,
@@ -13,8 +15,7 @@ const cron = require("node-cron");
 const getEpicGames = require("./fetchers/epic");
 const getSteamGames = require("./fetchers/steam.js");
 
-const CACHE_PATH = path.join(__dirname, "cache.json");
-
+// ... (semua kode fungsi Anda yang lain tetap sama) ...
 function loadCache() {
   if (!fs.existsSync(CACHE_PATH)) {
     fs.writeFileSync(CACHE_PATH, JSON.stringify({ epic: [], steam: [] }, null, 2));
@@ -148,5 +149,15 @@ client.on("messageCreate", async (message) => {
     sendGames(steam, message);
   }
 });
+
+
+// ===============================================================
+// TAMBAHKAN BLOK KODE DI BAWAH INI UNTUK KEEP-ALIVE
+// ===============================================================
+http.createServer((req, res) => {
+  res.write("Bot is alive!");
+  res.end();
+}).listen(8080);
+// ===============================================================
 
 client.login(process.env.DISCORD_TOKEN);
