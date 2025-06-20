@@ -6,8 +6,14 @@ const STEAM_URL_REGEX = /store\.steampowered\.com\/app\/(\d+)/;
 module.exports = async function getSteamGames() {
   try {
     // Ambil 25 postingan terbaru dari r/FreeGameFindings
-    const { data } = await axios.get('https://www.reddit.com/r/FreeGameFindings/new.json?limit=25');
-    const posts = data.data.children;
+    const { data } = await axios.get('https://www.reddit.com/r/FreeGameFindings/new.json?limit=25', {
+      // ====================================================================
+      // TAMBAHAN: Menambahkan header User-Agent agar tidak diblokir Reddit
+      // ====================================================================
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+      }
+    });
 
     const freeGames = posts
       .map(post => post.data)
