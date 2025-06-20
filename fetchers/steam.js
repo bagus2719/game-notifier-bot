@@ -1,36 +1,93 @@
-const axios = require('axios');
+const axios = require("axios");
 
-// Regex untuk menemukan App ID Steam dari URL toko
-const STEAM_URL_REGEX = /store\.steampowered\.com\/app\/(\d+)/;
+// Variabel untuk menyimpan token agar tidak perlu login setiap saat
+let redditToken = null;
+let tokenExpiryTime = 0;
 
+/**
+ * Fungsi untuk mendapatkan token akses dari Reddit API.
+ * Token akan disimpan sementara untuk digunakan kembali.
+ */
+async function getRedditAccessToken() {
+  // Jika token masih ada dan belum kedaluwarsa, gunakan token lama
+  if (redditToken && Date.now() < tokenExpiryTime) {
+    return redditToken;
+  }
+
+  console.log("Mendapatkan token akses baru dari Reddit...");
+
+  const authUrl = "https://www.reddit.com/api/v1/access_token";
+  const authData = new URLSearchParams({
+    grant_type: "password",
+    username: process.env.REDDIT_USERNAME,
+    password: process.env.REDDIT_PASSWORD,
+  });
+
+  const clientId = process.env.REDDIT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+
+  // Membuat header autentikasi Basic
+  const authHeader =
+    "Basic " + Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+  try {
+    const response = await axios.post(authUrl, authData, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: authHeader,
+        "User-Agent": "GameNotifierBot/1.0 by YourUsername", // User agent unik
+      },
+    });
+
+    const { access_token, expires_in } = response.data;
+    redditToken = access_token;
+    // Set waktu kedaluwarsa sedikit lebih cepat (kurangi 60 detik) untuk keamanan
+    tokenExpiryTime = Date.now() + (expires_in - 60) * 1000;
+
+    console.log("Token akses berhasil didapatkan.");
+    return redditToken;
+  } catch (error) {
+    console.error(
+      "Gagal total mendapatkan token Reddit:",
+      error.response?.data || error.message,
+    );
+    throw new Error("Autentikasi Reddit gagal.");
+  }
+}
+
+/**
+ * Fungsi utama untuk mengambil data game dari Reddit menggunakan API resmi.
+ */
 module.exports = async function getSteamGames() {
   try {
-    // ====================================================================
-    // PERUBAHAN: Menggunakan old.reddit.com untuk menghindari blokir
-    // ====================================================================
-    const { data } = await axios.get('https://old.reddit.com/r/FreeGameFindings/new.json?limit=25', {
+    const accessToken = await getRedditAccessToken();
+
+    // Gunakan endpoint oauth.reddit.com untuk permintaan terotentikasi
+    const apiUrl = "https://oauth.reddit.com/r/FreeGameFindings/new?limit=25";
+
+    const { data } = await axios.get(apiUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
-      }
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "GameNotifierBot/1.0 by YourUsername",
+      },
     });
 
     const posts = data.data.children;
+    const STEAM_URL_REGEX = /store\.steampowered\.com\/app\/(\d+)/;
 
     const freeGames = posts
-      .map(post => post.data)
-      // Filter postingan yang mengarah langsung ke Steam dan berisi kata kunci game gratis
-      .filter(post =>
-        post.url.includes('store.steampowered.com/app/') &&
-        /(100% off|free to keep|free weekend)/i.test(post.title)
+      .map((post) => post.data)
+      .filter(
+        (post) =>
+          post.url.includes("store.steampowered.com/app/") &&
+          /(100% off|free to keep|free weekend)/i.test(post.title),
       )
-      .map(post => {
+      .map((post) => {
         const match = post.url.match(STEAM_URL_REGEX);
         if (!match) return null;
 
         const appId = match[1];
-        // Bersihkan judul dari tag seperti [Steam], [Game], dll.
-        const title = post.title.replace(/\[.*?\]/g, '').trim();
-        // Gunakan gambar header resmi dari Steam untuk kualitas yang lebih baik
+        const title = post.title.replace(/\[.*?\]/g, "").trim();
         const imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
 
         return {
@@ -39,17 +96,21 @@ module.exports = async function getSteamGames() {
           clientUrl: `steam://store/${appId}`,
           image: imageUrl,
           ends: null,
-          source: 'Steam',
-          sourceIcon: 'https://store.akamai.steamstatic.com/public/shared/images/header/steam_logo_share.png',
-          region: 'ID',
+          source: "Steam",
+          sourceIcon:
+            "https://store.akamai.steamstatic.com/public/shared/images/header/steam_logo_share.png",
+          region: "ID",
         };
       })
-      .filter(game => game !== null);
+      .filter((game) => game !== null);
 
-    return [...new Map(freeGames.map(item => [item.url, item])).values()];
-
+    return [...new Map(freeGames.map((item) => [item.url, item])).values()];
   } catch (err) {
-    console.error('❌ Gagal mengambil data dari Steam/Reddit:', err);
+    // Error di sini kemungkinan besar karena token atau API, bukan lagi blokir
+    console.error(
+      "❌ Gagal mengambil data game dari Reddit API:",
+      err.response?.data || err.message,
+    );
     return [];
   }
 };
