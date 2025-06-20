@@ -14,18 +14,15 @@ module.exports = async function getEpicGames() {
         const offer = game.promotions.promotionalOffers[0].promotionalOffers[0];
         const ends = offer.endDate.split("T")[0];
 
-        // Dapatkan slug dari productSlug atau customAttributes
         const slug = game.productSlug || game.customAttributes?.find(
           (attr) => attr.key === "com.epicgames.app.productSlug"
         )?.value;
 
-        // Jika tidak ada slug, lewati item ini karena tidak bisa membuat URL yang valid
         if (!slug) {
           return null;
         }
         
         const url = `https://store.epicgames.com/id/p/${slug}`;
-        // Skema URI untuk Epic Games Launcher
         const clientUrl = `com.epicgames.launcher://store/p/${slug}`;
 
         return {
@@ -41,7 +38,6 @@ module.exports = async function getEpicGames() {
           region: "ID",
         };
       })
-      // Filter entri null yang dilewati karena tidak memiliki slug
       .filter(game => game !== null);
   } catch (err) {
     console.error("❌ Gagal mengambil data dari Epic Games:", err.message);
