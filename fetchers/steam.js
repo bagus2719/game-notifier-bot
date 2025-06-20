@@ -5,15 +5,16 @@ const STEAM_URL_REGEX = /store\.steampowered\.com\/app\/(\d+)/;
 
 module.exports = async function getSteamGames() {
   try {
-    // Ambil 25 postingan terbaru dari r/FreeGameFindings
-    const { data } = await axios.get('https://www.reddit.com/r/FreeGameFindings/new.json?limit=25', {
-      // ====================================================================
-      // TAMBAHAN: Menambahkan header User-Agent agar tidak diblokir Reddit
-      // ====================================================================
+    // ====================================================================
+    // PERUBAHAN: Menggunakan old.reddit.com untuk menghindari blokir
+    // ====================================================================
+    const { data } = await axios.get('https://old.reddit.com/r/FreeGameFindings/new.json?limit=25', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
       }
     });
+
+    const posts = data.data.children;
 
     const freeGames = posts
       .map(post => post.data)
@@ -35,17 +36,16 @@ module.exports = async function getSteamGames() {
         return {
           title: title,
           url: post.url,
-          clientUrl: `steam://store/${appId}`, // Tautan untuk membuka langsung di klien Steam
+          clientUrl: `steam://store/${appId}`,
           image: imageUrl,
-          ends: null, // Tanggal akhir tidak tersedia dari sumber Reddit
+          ends: null,
           source: 'Steam',
           sourceIcon: 'https://store.akamai.steamstatic.com/public/shared/images/header/steam_logo_share.png',
-          region: 'ID', // Anggap postingan relevan secara global
+          region: 'ID',
         };
       })
-      .filter(game => game !== null); // Hapus entri yang tidak cocok dengan regex URL
+      .filter(game => game !== null);
 
-    // Hapus game duplikat (berdasarkan URL) untuk menghindari repost
     return [...new Map(freeGames.map(item => [item.url, item])).values()];
 
   } catch (err) {
